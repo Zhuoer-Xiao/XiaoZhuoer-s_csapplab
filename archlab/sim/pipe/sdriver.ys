@@ -1,0 +1,129 @@
+#######################################################################
+# Test for copying block of size 4;
+#######################################################################
+	.pos 0
+main:	irmovq Stack, %rsp  	# Set up stack pointer
+
+	# Set up arguments for copy function and then invoke it
+	irmovq $4, %rdx		# src and dst have 4 elements
+	irmovq dest, %rsi	# dst array
+	irmovq src, %rdi	# src array
+	call ncopy		 
+	halt			# should halt with num nonzeros in %rax
+StartFun:
+#/* $begin ncopy-ys */
+##################################################################
+# ncopy.ys - Copy a src block of len words to dst.
+# Return the number of positive words (>0) contained in src.
+#
+# Written by fanese-myk, use iaddq, rearrange instruction to avoid load/use hazzard
+# use loop unrolling 5*1
+# make few changes from ver0.6 to make program run faster(avoid unpredicted branch)
+# Line 51 is fundamental
+##################################################################
+# Do not modify this portion
+# Function prologue.
+# %rdi = src, %rsi = dst, %rdx = l len
+ncopy:
+
+##################################################################
+    # Loop header
+    xorl %eax,%eax      # count = 0;
+    iaddq $-3, %edx     # len- = 3
+    jle next_start      # if so, goto Done:
+Loop1:  
+    mrmovl (%ebx), %esi # read val from src...
+    mrmovl 4(%ebx), %edi # read val from src + 1
+    rmmovl %esi, (%ecx) # ...and store it to dst
+    rmmovl %edi, 4(%ecx) # store it to dst + 1
+test1:
+    andl %esi, %esi     # *src <= 0 ?
+    jle test2
+    iaddq $1, %eax      # count++
+test2:
+    andl %edi, %edi     # *(src + 1) <= 0 ?
+    jle test3
+    iaddq $1, %eax      # count++
+test3:
+    mrmovl 8(%ebx), %esi # read val from src + 2
+    mrmovl 12(%ebx), %edi # read val from src + 3
+    rmmovl %esi, 8(%ecx) # store it to dst + 2
+    rmmovl %edi, 12(%ecx) # store it to dst + 3
+    andl %esi, %esi     # *(src + 2) <= 0?
+    jle test4
+    iaddq $1, %eax      # count++
+test4:
+    andl %edi, %edi     # *(src + 3) <= 0?
+    jle Npos
+    iaddq $1, %eax      # count++
+Npos:
+    iaddq $16, %ebx     # src += 4
+    iaddq $16, %ecx     # dst += 4
+    iaddq $-4, %edx     # len -= 4
+    andl %edx,%edx      # len > 0?
+    jg Loop1            # if so, goto Loop:
+next_start:
+    iaddq $3, %edx      # len += 3
+    jle Done
+loop2:
+    mrmovl (%ebx), %esi # read val from src
+    rmmovl %esi, (%ecx) # store it to dst
+    andl %esi, %esi     # *src <= 0 ?
+    jle test5
+    iaddq $1, %eax      # count++
+test5:
+    iaddq $4, %ebx      # src += 1
+    iaddq $4, %ecx      # dst += 1
+    iaddq $-1, %edx     # len -= 1
+    jg loop2
+##################################################################
+# Do not modify the following section of code
+# Function epilogue.
+##################################################################
+# Keep the following label at the end of your function
+End:
+#/* $end ncopy-ys */
+EndFun:
+
+###############################
+# Source and destination blocks 
+###############################
+	.align 8
+src:
+	.quad -1
+	.quad -2
+	.quad 3
+	.quad 4
+	.quad 0xbcdefa # This shouldn't get moved
+
+	.align 16
+Predest:
+	.quad 0xbcdefa
+dest:
+	.quad 0xcdefab
+	.quad 0xcdefab
+	.quad 0xcdefab
+	.quad 0xcdefab
+Postdest:
+	.quad 0xdefabc
+
+.align 8
+# Run time stack
+	.quad 0
+	.quad 0
+	.quad 0
+	.quad 0
+	.quad 0
+	.quad 0
+	.quad 0
+	.quad 0
+	.quad 0
+	.quad 0
+	.quad 0
+	.quad 0
+	.quad 0
+	.quad 0
+	.quad 0
+	.quad 0
+
+Stack:
