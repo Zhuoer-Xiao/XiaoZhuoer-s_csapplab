@@ -1,7 +1,7 @@
 ﻿/* 
  * CS:APP Data Lab 
  * 
- * <Please put your name and userid here>
+ * <xze>
  * 
  * bits.c - Source file with your solutions to the Lab.
  *          This is the file you will hand in to your instructor.
@@ -140,7 +140,7 @@ NOTES:
  *   Rating: 1
  */
 int bitXor(int x, int y) {
-  return (x&~y)|(~x&y);
+      return ~(~x & ~y) & ~(x & y);
 }
 /* 
  * tmin - return minimum two's complement integer 
@@ -149,7 +149,7 @@ int bitXor(int x, int y) {
  *   Rating: 1
  */
 int tmin(void) {
-  return (0x1<<31);
+  return 0x1 << 31;
 }
 //2
 /*
@@ -160,7 +160,7 @@ int tmin(void) {
  *   Rating: 2
  */
 int isTmax(int x) {
-  return !(x^0x7FFFFFFF);
+    return !(~(x + 1) ^ x) & !!(x + 1);
 }
 /* 
  * allOddBits - return 1 if all odd-numbered bits in word set to 1
@@ -170,7 +170,10 @@ int isTmax(int x) {
  *   Rating: 2
  */
 int allOddBits(int x) {
-  return !((x&0xAAAAAAAA)^0xAAAAAAAA);
+    int a = 0xAA << 8;
+    int b = a | 0xAA;
+    int c = b << 16 | b;
+    return !((x & c) ^ (c));
 }
 /* 
  * negate - return -x 
@@ -180,7 +183,7 @@ int allOddBits(int x) {
  *   Rating: 2
  */
 int negate(int x) {
-  return ((~x)+0x1);
+    return ~x + 1;
 }
 //3
 /* 
@@ -193,7 +196,7 @@ int negate(int x) {
  *   Rating: 3
  */
 int isAsciiDigit(int x) {
-  return (!((x>>4)^0x00000003))&(((!!(x&0x00000008))^(!!(x&0x00000006)))|!(x&0x00000008));
+    return (!(x >> 4 ^ 0x3)) & !!(((x & 0xF) + (~0xA + 1)) >>31);
 }
 /* 
  * conditional - same as x ? y : z 
@@ -203,7 +206,7 @@ int isAsciiDigit(int x) {
  *   Rating: 3
  */
 int conditional(int x, int y, int z) {
-  return ((~(!!x)+0x1)&y)|(~(~(!!x)+0x1)&z);
+    return ((~(!!x) + 1) & y) | (~(~(!!x) + 1) & z);
 }
 /* 
  * isLessOrEqual - if x <= y  then return 1, else return 0 
@@ -213,7 +216,13 @@ int conditional(int x, int y, int z) {
  *   Rating: 3
  */
 int isLessOrEqual(int x, int y) {
-  return (((x>>31)&0x1)&!((y>>31)&0x1))|(!((((x>>31)&0x1)^(x>>31)&0x1))&(((y+(~x+1))>>31)^0x1));
+    int signX = (x >> 31) & 0x1;
+    int signY = (y >> 31) & 0x1;
+    //(signX&~signY);异号时x为负的情况
+    //(signX&~signY)|!(~signX&signY);包含同号情况
+    int z = y + (~x + 1);
+    int flag = z >> 31;
+    return (signX & ~signY) | (!(~signX & signY) & !flag);
 }
 //4
 /* 
@@ -225,7 +234,7 @@ int isLessOrEqual(int x, int y) {
  *   Rating: 4 
  */
 int logicalNeg(int x) {
-  return !!!x;
+    return ((x | (~x + 1)) >> 31) + 1;
 }
 /* howManyBits - return the minimum number of bits required to represent x in
  *             two's complement
@@ -240,21 +249,21 @@ int logicalNeg(int x) {
  *  Rating: 4
  */
 int howManyBits(int x) {
-  int sign=x>>31;
-  x=(sign&~x)|(~sign&x);
-  int b16,b8,b4,b2,b1,b0;
-  b16=!!(x>>16)<<4;
-  x>>=b16;
-  b8=!!(x>>8)<<3;
-  x>>=b8;
-  b4=!!(x>>4)<<2;
-  x>>=b4;
-  b2=!!(x>>2)<<1;
-  x>>=b2;
-  b1=!!(x>>1);
-  x>>=b1;
-  b0=x;
-  return b16+b8+b4+b2+b1+b0+1;
+    int flag = x >> 31;
+    x = (flag & ~x) | (~flag & x);
+    int b16, b8, b4, b2, b1, b0;
+    b16 = !!(x >> 16) << 4;//如果高16为有1，那么低16为必须满足，此时b16为16
+    x = x >> b16;
+    b8 = !!(x >> 8) << 3;//剩余位高8位是否有1
+    x = x >> b8;//如果有（至少需要16+8=24位），则右移8位
+    b4 = !!(x >> 4) << 2;//同理
+    x = x >> b4;
+    b2 = !!(x >> 2) << 1;
+    x = x >> b2;
+    b1 = !!(x >> 1);
+    x = x >> b1;
+    b0 = x;
+    return b16 + b8 + b4 + b2 + b1 + b0 + 1;//加上符号位
 }
 //float
 /* 
@@ -269,22 +278,13 @@ int howManyBits(int x) {
  *   Rating: 4
  */
 unsigned float_twice(unsigned uf) {
-  unsigned sign=(uf&0x1<<31);
-  unsigned exp=(uf&0x7f800000)>>23;
-  unsigned frac=uf&0x7FFFFF;
-  if(exp==0xFF){
-    return uf;
-  }else if (exp==0x0)
-  {
-    frac<<=1;
-  }else{
-    exp+=1;
-  }
-  if(exp==0xFF){
-    //overflow
-    return sign|0x7F800000;
-  }
-  return sign|(exp<<23)|frac;
+    int exp = (uf & 0x7f800000) >> 23;
+    int sign = uf & (1 << 31);
+    if (exp == 0) return uf << 1 | sign;
+    if (exp == 255) return uf;
+    exp++;
+    if (exp == 255) return 0x7f800000 | sign;
+    return (exp << 23) | (uf & 0x807fffff);
 }
 /* 
  * float_i2f - Return bit-level equivalent of expression (float) x
@@ -296,7 +296,7 @@ unsigned float_twice(unsigned uf) {
  *   Rating: 4
  */
 unsigned float_i2f(int x) {
- if (!x) {
+    if (!x) {
         return x;
     }
     else if (x == 0x80000000) {
@@ -340,25 +340,25 @@ unsigned float_i2f(int x) {
  *   Rating: 4
  */
 int float_f2i(unsigned uf) {
-  unsigned exp = (uf & 0x7f800000) >> 23;
-  int sign = uf >> 31 & 0x1;
-  unsigned frac = uf & 0x7FFFFF;
-  int E = exp - 127;
-  if (E < 0)return 0;
-  else if (E >= 31) {
-    return 0x80000000u;
-  }
-  else {
-      frac = frac | 1 << 23;
-      if (E < 23) {//需要舍入
-        frac >>= (23 - E);
-      }
-      else {
-        frac <<= (E - 23);
-      }
-  }
-  if (sign) {
-    return -frac;
-  }
-    return frac;
+    unsigned exp = (uf & 0x7f800000) >> 23;
+    int sign = uf >> 31 & 0x1;
+    unsigned frac = uf & 0x7FFFFF;
+    int E = exp - 127;
+    if (E < 0)return 0;
+    else if (E >= 31) {
+        return 0x80000000u;
+    }
+    else {
+        frac = frac | 1 << 23;
+        if (E < 23) {//需要舍入
+            frac >>= (23 - E);
+        }
+        else {
+            frac <<= (E - 23);
+        }
+    }
+    if (sign) {
+        return -frac;
+    }
+        return frac;
 }
